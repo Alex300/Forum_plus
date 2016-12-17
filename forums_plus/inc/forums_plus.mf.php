@@ -1,61 +1,74 @@
 <?php
 defined('COT_CODE') or die('Wrong URL');
+
 /**
  * Forums plus plugin for Cotonti Siena CMF
- *      My Forums Controller
+ *
+ * My Forums Controller
+ *
  * @package Forums
- * @author Alex <natty-photo@yandex.ru>
- * @copyright (c) 2013 Alex http://portal30.ru
+ *
+ * @author  Kalnov Alexey    <kalnovalexey@yandex.ru>
+ * @copyright Portal30 Studio http://portal30.ru
  */
 class MfController{
 
     /**
      * Main (index) Action.
-     * Объявления пользователя
      */
     public function indexAction(){
-        global $t, $L, $cfg, $usr, $sys, $out, $db_users, $db;
         cot_die_message(404, TRUE);
         return "qwerty";
 
     }
 
     /**
-     * Последние сообщения пользователя
+     * My posts
      */
-    public function myPostsAction(){
-        global $L, $usr, $cfg, $db, $db_forum_posts, $db_forum_topics, $R, $structure;
-
-        if ($usr['id'] <= 0){
+    public function myPostsAction()
+    {
+        if (cot::$usr['id'] <= 0){
             return false;
         }
 
-        if(COT_AJAX){
+        if(COT_AJAX) {
             $po = 'more';
-        }else{
+
+        } else {
             $po = cot_import('po', 'G', 'ALP');
         }
+
         $s = cot_import('s','G','TXT'); // Section CODE
         if(!$s) $s = cot_import('s','P','TXT');
 
         $where = '';
-        if ($s && !empty($structure['forums'][$s])){
+        if ($s && !empty(cot::$structure['forums'][$s])){
             $sections = cot_structure_children('forums', $s);
             $where = " AND t.ft_cat IN ('".implode("', '", $sections)."')";
         }
 
-        $po_max = ($po=='more' && $cfg['plugin']['forums_plus']['mf_maxlines'] >
-                                                                    $cfg['plugin']['forums_plus']['mf_deflines']) ?
-                        $cfg['plugin']['forums_plus']['mf_maxlines'] : $cfg['plugin']['forums_plus']['mf_deflines'];
+        $po_max = ($po=='more' && cot::$cfg['plugin']['forums_plus']['mf_maxlines'] >
+            cot::$cfg['plugin']['forums_plus']['mf_deflines']) ?
+            cot::$cfg['plugin']['forums_plus']['mf_maxlines'] : cot::$cfg['plugin']['forums_plus']['mf_deflines'];
 
-        $sqltmp = $db->query("SELECT p.fp_id, t.ft_id, t.ft_cat, t.ft_title, t.ft_desc, t.ft_updated, t.ft_lastposterid,
+
+        $sql = "SELECT t.ft_id, p.fp_id, t.ft_cat, t.ft_title, t.ft_desc, t.ft_updated, t.ft_lastposterid,
               t.ft_lastpostername, t.ft_movedto, t.ft_preview
-            FROM $db_forum_posts AS p
-            LEFT JOIN $db_forum_topics AS t ON t.ft_id=p.fp_topicid
-            WHERE fp_posterid=? $where
-            GROUP BY t.ft_id
+              
+            FROM ".cot::$db->forum_topics." as t
+            JOIN ".cot::$db->forum_posts." AS p ON t.ft_id=p.fp_topicid
+            JOIN (
+                SELECT fp_topicid, max(fp_creation) as max_created
+                FROM ".cot::$db->forum_posts."
+                WHERE fp_posterid=".cot::$usr['id']."
+                GROUP BY fp_topicid
+                )fp ON p.fp_creation = fp.max_created
+            
+            WHERE p.fp_posterid=".cot::$usr['id']." $where
             ORDER BY ft_updated DESC
-            LIMIT $po_max", array($usr['id']));
+            LIMIT $po_max";
+
+        $sqltmp = cot::$db->query($sql);
 
         $tpl = new XTemplate(cot_tplfile('forums_plus.myposts', 'plug'));
 
@@ -67,15 +80,15 @@ class MfController{
         foreach($myPosts as $mf_row){
             if ($mf_row['ft_movedto'] > 0){
                 $mf_row['ft_url'] = cot_url('forums', "m=posts&q=".$mf_row['ft_movedto']);
-                $mf_row['lastposter'] = $R['forums_code_post_empty'];
+                $mf_row['lastposter'] = cot::$R['forums_code_post_empty'];
                 $mf_row['ft_lastposturl'] = cot_url('forums', "m=posts&q=".$mf_row['ft_movedto']."&n=last", "#bottom");
-                $mf_row['ft_lastpostlink'] = cot_rc_link($mf_row['ft_lastposturl'], $R['icon_follow'], 'rel="nofollow"')
-                    .$L['Moved'];
-            }else{
+                $mf_row['ft_lastpostlink'] = cot_rc_link($mf_row['ft_lastposturl'], cot::$R['icon_follow'], 'rel="nofollow"')
+                    .cot::$L['Moved'];
+            } else {
                 $mf_row['ft_url'] = cot_url('forums', "m=posts&q=".$mf_row['ft_id']);
                 $mf_row['lastposter'] = cot_build_user($mf_row['ft_lastposterid'], htmlspecialchars($mf_row['ft_lastpostername']));
                 $mf_row['ft_lastposturl']  = cot_url('forums', "m=posts&q=".$mf_row['ft_id']."&n=last", "#bottom");
-                $mf_row['ft_lastpostlink'] = cot_rc_link($mf_row['ft_lastposturl'], $R['icon_unread'], 'rel="nofollow"').cot_date('datetime_short', $mf_row['ft_updated']);
+                $mf_row['ft_lastpostlink'] = cot_rc_link($mf_row['ft_lastposturl'], cot::$R['icon_unread'], 'rel="nofollow"').cot_date('datetime_short', $mf_row['ft_updated']);
             }
 
             $tpl->assign(array(
@@ -93,7 +106,6 @@ class MfController{
                 'MF_ROW_TOPIC_LATSPOST_URL' => $mf_row['ft_lastposturl'],
                 'MF_ROW_TOPIC_PREVIEW' => $mf_row['ft_preview'].'...',
                 'MF_ROW_TOPIC_UPDATED' => cot_date('datetime_medium', $mf_row['ft_updated']),
-                'MF_ROW_TOPIC_UPDATED_STAMP' => $mf_row['ft_updated'],
                 'MF_ROW_CAT' => $mf_row['ft_cat'],
                 'MF_MODE' => ($po == 'more') ? 'more' : 'default',
             ));
@@ -112,7 +124,7 @@ class MfController{
 
         $tpl->parse('MAIN');
 
-        if(COT_AJAX){
+        if(COT_AJAX) {
             echo $tpl->text();
             exit();
         }

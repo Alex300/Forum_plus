@@ -9,8 +9,9 @@ Tags=forums.sections.tpl: {FORUMS_SECTIONS_MYPOSTS}
  * Forums plus plugin for Cotonti Siena CMF
  *
  * @package Forums
- * @author Alex
- * @copyright (c) 2013 Alex http://portal30.ru
+ *
+ * @author  Kalnov Alexey    <kalnovalexey@yandex.ru>
+ * @copyright Portal30 Studio http://portal30.ru
  */
 defined('COT_CODE') or die('Wrong URL');
 
@@ -19,7 +20,7 @@ require_once cot_incfile('forums_plus', 'plug', 'mf');
 // Lang file
 require_once(cot_langfile('forums_plus'));
 
-if ($usr['id']>0){
+if (cot::$usr['id']>0) {
 
     $mf = new MfController();
 
@@ -27,9 +28,7 @@ if ($usr['id']>0){
         "FORUMS_SECTIONS_MYPOSTS" => $mf->myPostsAction()
     ));
 
-}
-else
-{
+} else {
     $myforums_myposts = "&nbsp;";
 }
 
